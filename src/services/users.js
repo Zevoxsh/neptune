@@ -23,6 +23,7 @@ async function listUsers({ requestingUserId, requestingRole }) {
     const [rows] = await pool.query(`SELECT ${USER_FIELDS} FROM users ORDER BY created_at DESC`);
     return rows;
   }
+  // Returns only this user's clients — the user's own record is managed via profile, not here
   const [rows] = await pool.query(
     `SELECT ${USER_FIELDS} FROM users WHERE parent_id = ? ORDER BY created_at DESC`,
     [requestingUserId]

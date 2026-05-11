@@ -60,6 +60,13 @@ router.post('/', requireAuth, requireRole('admin', 'user'), async (req, res) => 
   const parentId = req.user.role === 'user' ? req.user.id
     : (role === 'client' ? (req.body.parent_id || null) : null);
   try {
+    // Validate admin-provided parent_id references an active user-role account
+    if (parentId !== null && req.user.role === 'admin') {
+      const parent = await users.getUserById(parentId);
+      if (!parent || parent.role !== 'user' || !parent.is_active) {
+        return res.status(400).json({ error: 'parent_id must reference an active user account' });
+      }
+    }
     const user = await users.createUser({ username, email, password, role, parentId, diskQuotaMb: disk_quota_mb });
     await audit.log({ userId: req.user.id, action: 'create_user', targetType: 'user', targetId: user.id, ip: req.ip });
     res.status(201).json({ user });
@@ -80,6 +87,9 @@ router.put('/:id', requireAuth, async (req, res) => {
     if (!canAccessUser(req.user, target)) return res.status(403).json({ error: 'Forbidden' });
     const { username, email } = req.body;
     const diskQuotaMb = req.user.role === 'admin' ? req.body.disk_quota_mb : undefined;
+    if (diskQuotaMb !== undefined && (!Number.isInteger(diskQuotaMb) || diskQuotaMb <= 0)) {
+      return res.status(400).json({ error: 'disk_quota_mb must be a positive integer' });
+    }
     const isActive = req.user.role === 'admin' ? req.body.is_active : undefined;
     const updated = await users.updateUser(targetId, { username, email, diskQuotaMb, isActive });
     await audit.log({ userId: req.user.id, action: 'update_user', targetType: 'user', targetId, ip: req.ip });
