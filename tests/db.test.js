@@ -15,6 +15,7 @@ describe('database pool', () => {
     expect(tables).toEqual(expect.arrayContaining([
       'users', 'domains', 'ssl_certificates', 'databases',
       'ftp_accounts', 'audit_logs', 'client_permissions', 'refresh_tokens',
+      'schema_migrations',
     ]));
   });
 });

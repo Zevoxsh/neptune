@@ -64,14 +64,14 @@ CREATE TABLE IF NOT EXISTS ftp_accounts (
 
 CREATE TABLE IF NOT EXISTS audit_logs (
   id INT PRIMARY KEY AUTO_INCREMENT,
-  user_id INT NOT NULL,
+  user_id INT NULL,
   action VARCHAR(100) NOT NULL,
   target_type VARCHAR(50) NULL,
   target_id INT NULL,
   ip_address VARCHAR(45) NOT NULL,
   details JSON NULL,
   created_at DATETIME NOT NULL DEFAULT NOW(),
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS client_permissions (
@@ -89,5 +89,6 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
   token_hash VARCHAR(255) NOT NULL UNIQUE,
   expires_at DATETIME NOT NULL,
   created_at DATETIME NOT NULL DEFAULT NOW(),
+  INDEX idx_expires_at (expires_at),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
