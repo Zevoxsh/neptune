@@ -1,4 +1,3 @@
-require('dotenv').config();
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -33,7 +32,9 @@ router.post('/login', loginLimiter, async (req, res) => {
       [email]
     );
     const user = rows[0];
-    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+    const DUMMY_HASH = '$2a$12$invalidhashfortimingnobcryptcmp0000000000000000000000000';
+    const passwordMatch = await bcrypt.compare(password, user ? user.password_hash : DUMMY_HASH);
+    if (!user || !passwordMatch) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     if (!user.is_active) {
@@ -89,7 +90,11 @@ router.post('/logout', async (req, res) => {
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
     await pool.query('DELETE FROM refresh_tokens WHERE token_hash = ?', [tokenHash]).catch(() => {});
   }
-  res.clearCookie('refreshToken');
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+  });
   res.json({ ok: true });
 });
 

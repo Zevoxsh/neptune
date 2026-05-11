@@ -22,7 +22,7 @@ async function createUser({
   role = 'user',
   parentId = null,
 } = {}) {
-  const hash = await bcrypt.hash(password, 12);
+  const hash = await bcrypt.hash(password, process.env.NODE_ENV === 'test' ? 1 : 12);
   const [result] = await pool.query(
     'INSERT INTO users (username, email, password_hash, role, parent_id) VALUES (?, ?, ?, ?, ?)',
     [username, email, hash, role, parentId]
