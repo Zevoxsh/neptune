@@ -5,12 +5,18 @@ const audit = require('../services/audit');
 const users = require('../services/users');
 
 const VALID_PERMISSION_KEYS = ['allow_subdomain', 'allow_php_version_choice'];
+const VALID_ROLES = ['admin', 'user', 'client'];
 
 function canAccessUser(requester, target) {
   if (requester.role === 'admin') return true;
   if (requester.id === target.id) return true;
   if (requester.role === 'user' && target.parent_id === requester.id) return true;
   return false;
+}
+
+function parseId(param) {
+  const n = Number(param);
+  return Number.isInteger(n) && n > 0 ? n : null;
 }
 
 // GET /api/users
@@ -26,7 +32,8 @@ router.get('/', requireAuth, requireRole('admin', 'user'), async (req, res) => {
 
 // GET /api/users/:id
 router.get('/:id', requireAuth, async (req, res) => {
-  const targetId = Number(req.params.id);
+  const targetId = parseId(req.params.id);
+  if (targetId === null) return res.status(400).json({ error: 'Invalid id' });
   try {
     const target = await users.getUserById(targetId);
     if (!target) return res.status(404).json({ error: 'User not found' });
@@ -43,6 +50,9 @@ router.post('/', requireAuth, requireRole('admin', 'user'), async (req, res) => 
   const { username, email, password, role, disk_quota_mb } = req.body;
   if (!username || !email || !password || !role) {
     return res.status(400).json({ error: 'username, email, password, role required' });
+  }
+  if (!VALID_ROLES.includes(role)) {
+    return res.status(400).json({ error: 'Invalid role' });
   }
   if (req.user.role === 'user' && role !== 'client') {
     return res.status(403).json({ error: 'Users can only create client accounts' });
@@ -62,7 +72,8 @@ router.post('/', requireAuth, requireRole('admin', 'user'), async (req, res) => 
 
 // PUT /api/users/:id
 router.put('/:id', requireAuth, async (req, res) => {
-  const targetId = Number(req.params.id);
+  const targetId = parseId(req.params.id);
+  if (targetId === null) return res.status(400).json({ error: 'Invalid id' });
   try {
     const target = await users.getUserById(targetId);
     if (!target) return res.status(404).json({ error: 'User not found' });
@@ -82,7 +93,8 @@ router.put('/:id', requireAuth, async (req, res) => {
 
 // DELETE /api/users/:id — soft delete (deactivate)
 router.delete('/:id', requireAuth, requireRole('admin', 'user'), async (req, res) => {
-  const targetId = Number(req.params.id);
+  const targetId = parseId(req.params.id);
+  if (targetId === null) return res.status(400).json({ error: 'Invalid id' });
   if (req.user.id === targetId) return res.status(400).json({ error: 'Cannot deactivate yourself' });
   try {
     const target = await users.getUserById(targetId);
@@ -99,7 +111,8 @@ router.delete('/:id', requireAuth, requireRole('admin', 'user'), async (req, res
 
 // POST /api/users/:id/password
 router.post('/:id/password', requireAuth, async (req, res) => {
-  const targetId = Number(req.params.id);
+  const targetId = parseId(req.params.id);
+  if (targetId === null) return res.status(400).json({ error: 'Invalid id' });
   const { new_password } = req.body;
   if (!new_password || new_password.length < 8) {
     return res.status(400).json({ error: 'new_password must be at least 8 characters' });
@@ -119,11 +132,13 @@ router.post('/:id/password', requireAuth, async (req, res) => {
 
 // GET /api/users/:id/permissions
 router.get('/:id/permissions', requireAuth, async (req, res) => {
-  const targetId = Number(req.params.id);
+  const targetId = parseId(req.params.id);
+  if (targetId === null) return res.status(400).json({ error: 'Invalid id' });
   try {
     const target = await users.getUserById(targetId);
     if (!target) return res.status(404).json({ error: 'User not found' });
     if (target.role !== 'client') return res.status(400).json({ error: 'Permissions only apply to client accounts' });
+    // canAccessUser not used: clients must not read their own permissions (only admin/parent-user may)
     if (req.user.role !== 'admin' && !(req.user.role === 'user' && target.parent_id === req.user.id)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
@@ -137,7 +152,8 @@ router.get('/:id/permissions', requireAuth, async (req, res) => {
 
 // PUT /api/users/:id/permissions
 router.put('/:id/permissions', requireAuth, requireRole('admin', 'user'), async (req, res) => {
-  const targetId = Number(req.params.id);
+  const targetId = parseId(req.params.id);
+  if (targetId === null) return res.status(400).json({ error: 'Invalid id' });
   const { permissions } = req.body;
   if (!permissions || typeof permissions !== 'object' || Array.isArray(permissions)) {
     return res.status(400).json({ error: 'permissions object required' });
@@ -148,6 +164,7 @@ router.put('/:id/permissions', requireAuth, requireRole('admin', 'user'), async 
     const target = await users.getUserById(targetId);
     if (!target) return res.status(404).json({ error: 'User not found' });
     if (target.role !== 'client') return res.status(400).json({ error: 'Permissions only apply to client accounts' });
+    // canAccessUser not used: clients must not write their own permissions (only admin/parent-user may)
     if (req.user.role === 'user' && target.parent_id !== req.user.id) {
       return res.status(403).json({ error: 'Forbidden' });
     }
