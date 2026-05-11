@@ -14,7 +14,8 @@
     "test:watch": "jest --watch --runInBand --forceExit"
   },
   "jest": {
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "setupFiles": ["./tests/setup.js"]
   },
   "keywords": [],
   "author": "",
