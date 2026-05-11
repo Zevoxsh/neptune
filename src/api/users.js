@@ -87,9 +87,7 @@ router.delete('/:id', requireAuth, requireRole('admin', 'user'), async (req, res
   try {
     const target = await users.getUserById(targetId);
     if (!target) return res.status(404).json({ error: 'User not found' });
-    if (req.user.role === 'user' && target.parent_id !== req.user.id) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
+    if (!canAccessUser(req.user, target)) return res.status(403).json({ error: 'Forbidden' });
     await users.updateUser(targetId, { isActive: false });
     await audit.log({ userId: req.user.id, action: 'deactivate_user', targetType: 'user', targetId, ip: req.ip });
     res.json({ ok: true });
