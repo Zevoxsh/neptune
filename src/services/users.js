@@ -45,7 +45,8 @@ async function updateUser(id, { username, email, diskQuotaMb, isActive }) {
 
 async function changePassword(id, newPassword) {
   const hash = await bcrypt.hash(newPassword, BCRYPT_COST);
-  await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, id]);
+  const [result] = await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, id]);
+  return result.affectedRows > 0;
 }
 
 async function getClientPermissions(clientId) {
@@ -57,12 +58,22 @@ async function getClientPermissions(clientId) {
 }
 
 async function setClientPermissions(clientId, permissions) {
-  for (const [key, allowed] of Object.entries(permissions)) {
-    await pool.query(
-      `INSERT INTO client_permissions (user_id, permission_key, allowed) VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)`,
-      [clientId, key, allowed ? 1 : 0]
-    );
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    for (const [key, allowed] of Object.entries(permissions)) {
+      await conn.query(
+        `INSERT INTO client_permissions (user_id, permission_key, allowed) VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)`,
+        [clientId, key, allowed ? 1 : 0]
+      );
+    }
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
   }
   return getClientPermissions(clientId);
 }

@@ -1,11 +1,11 @@
 require('dotenv').config();
+const bcrypt = require('bcryptjs');
 const { createUser, getUserById, listUsers, updateUser, changePassword, getClientPermissions, setClientPermissions } = require('../src/services/users');
 const pool = require('../src/db/index');
 const { clearTables } = require('./helpers/db');
 
-beforeEach(() => clearTables());
-
 describe('users service', () => {
+  beforeEach(() => clearTables());
   it('createUser inserts and returns user without password_hash', async () => {
     const user = await createUser({ username: 'alice', email: 'alice@t.com', password: 'pass1234', role: 'user' });
     expect(user.id).toBeDefined();
@@ -45,7 +45,6 @@ describe('users service', () => {
   });
 
   it('changePassword updates the hash so new password works', async () => {
-    const bcrypt = require('bcryptjs');
     const user = await createUser({ username: 'u', email: 'u@t.com', password: 'oldpass', role: 'user' });
     await changePassword(user.id, 'newpass123');
     const [rows] = await pool.query('SELECT password_hash FROM users WHERE id = ?', [user.id]);
