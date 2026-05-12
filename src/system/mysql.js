@@ -20,9 +20,15 @@ async function createDatabase(dbName, dbUser, password) {
   const conn = await getMgmtPool().getConnection();
   try {
     await conn.query('CREATE DATABASE ??', [dbName]);
-    await conn.query("CREATE USER ?@'localhost' IDENTIFIED BY ?", [dbUser, password]);
-    await conn.query("GRANT ALL PRIVILEGES ON ??.* TO ?@'localhost'", [dbName, dbUser]);
-    await conn.query('FLUSH PRIVILEGES');
+    try {
+      await conn.query("CREATE USER ?@'localhost' IDENTIFIED BY ?", [dbUser, password]);
+      await conn.query("GRANT ALL PRIVILEGES ON ??.* TO ?@'localhost'", [dbName, dbUser]);
+      await conn.query('FLUSH PRIVILEGES');
+    } catch (err) {
+      await conn.query('DROP DATABASE IF EXISTS ??', [dbName]).catch(() => {});
+      await conn.query("DROP USER IF EXISTS ?@'localhost'", [dbUser]).catch(() => {});
+      throw err;
+    }
   } finally {
     conn.release();
   }
