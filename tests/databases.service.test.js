@@ -3,6 +3,7 @@ const { clearTables, createUser } = require('./helpers/db');
 const {
   createDatabase, listDatabases, getDatabaseById, resetDatabasePassword, dropDatabase,
 } = require('../src/services/databases');
+const mysql = require('../src/system/mysql');
 
 jest.mock('../src/system/mysql', () => ({
   createDatabase: jest.fn().mockResolvedValue(undefined),
@@ -76,7 +77,6 @@ describe('resetDatabasePassword', () => {
     const { database } = await createDatabase({ userId: user.id, name: 'testdb' });
     const { password: newPassword } = await resetDatabasePassword(database.id);
     expect(newPassword).toHaveLength(32);
-    const mysql = require('../src/system/mysql');
     expect(mysql.changePassword).toHaveBeenCalledWith(database.db_user, newPassword);
   });
 

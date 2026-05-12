@@ -12,6 +12,7 @@ function buildDbName(username, name) {
   return `${username}_${name}`;
 }
 
+// Truncation can produce collisions if two names share the first 32 chars — acceptable for typical username lengths.
 function buildDbUser(username, name) {
   const full = `${username}_${name}`;
   return full.length <= 32 ? full : full.slice(0, 32);
@@ -19,7 +20,7 @@ function buildDbUser(username, name) {
 
 async function refreshSize(row) {
   const sizeMb = await mysql.getDatabaseSizeMb(row.db_name);
-  pool.query('UPDATE `databases` SET size_mb = ? WHERE id = ?', [sizeMb, row.id]).catch(() => {});
+  pool.query('UPDATE `databases` SET size_mb = ? WHERE id = ?', [sizeMb, row.id]).catch(e => console.warn('refreshSize update failed:', e));
   return { ...row, size_mb: sizeMb };
 }
 
