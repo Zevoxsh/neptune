@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const { requireAuth } = require('../middleware/auth');
+const { requireRole } = require('../middleware/rbac');
 const audit = require('../services/audit');
 const ftpService = require('../services/ftp');
 
@@ -25,7 +26,7 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 // POST /api/ftp
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, requireRole('admin', 'user'), async (req, res) => {
   const { ftp_username, password, home_dir } = req.body;
   if (!ftp_username || !password || !home_dir) {
     return res.status(400).json({ error: 'ftp_username, password, and home_dir required' });
@@ -44,7 +45,8 @@ router.post('/', requireAuth, async (req, res) => {
       homeDir: home_dir,
     });
     await audit.log({ userId: req.user.id, action: 'create_ftp_account', targetType: 'ftp_account', targetId: account.id, ip: req.ip }).catch(e => console.error('audit failure:', e));
-    res.status(201).json({ account });
+    const { ftp_password_hash: _, ...safeAccount } = account;
+    res.status(201).json({ account: safeAccount });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'FTP username already exists' });
     if (err.code === 'PATH_TRAVERSAL') return res.status(400).json({ error: 'home_dir is outside your root' });
