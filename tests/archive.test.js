@@ -89,11 +89,73 @@ describe('extractZip security', () => {
       output.on('error', reject);
       arc.on('error', reject);
       arc.pipe(output);
-      arc.file(srcFile, { name: '../evil.txt' });
+      arc.file(srcFile, { name: 'foo/../../evil.txt' });
       arc.finalize();
     });
     const destDir = path.join(tmpDir, 'safe-dest');
     await fs.mkdir(destDir, { recursive: true });
     await expect(extractZip(maliciousZip, destDir)).rejects.toMatchObject({ code: 'ZIP_SLIP' });
+  });
+
+  it('throws ZIP_SLIP for symlink zip entries', async () => {
+    // Hand-crafted ZIP with externalFileAttributes = 0xA1ED0000 (S_IFLNK | 0755)
+    const fnBuf = Buffer.from('link.txt');
+    const fileData = Buffer.from('X');
+
+    const localHeader = Buffer.alloc(30 + fnBuf.length + fileData.length);
+    let o = 0;
+    localHeader.writeUInt32LE(0x04034b50, o); o += 4;
+    localHeader.writeUInt16LE(20, o); o += 2;
+    localHeader.writeUInt16LE(0, o); o += 2;
+    localHeader.writeUInt16LE(0, o); o += 2;
+    localHeader.writeUInt16LE(0, o); o += 2;
+    localHeader.writeUInt16LE(0, o); o += 2;
+    localHeader.writeUInt32LE(0, o); o += 4;
+    localHeader.writeUInt32LE(fileData.length, o); o += 4;
+    localHeader.writeUInt32LE(fileData.length, o); o += 4;
+    localHeader.writeUInt16LE(fnBuf.length, o); o += 2;
+    localHeader.writeUInt16LE(0, o); o += 2;
+    fnBuf.copy(localHeader, o); o += fnBuf.length;
+    fileData.copy(localHeader, o);
+
+    const cdOffset = localHeader.length;
+    const centralDir = Buffer.alloc(46 + fnBuf.length);
+    o = 0;
+    centralDir.writeUInt32LE(0x02014b50, o); o += 4;
+    centralDir.writeUInt16LE(0x031e, o); o += 2;    // version made by: Unix(3), v30
+    centralDir.writeUInt16LE(20, o); o += 2;
+    centralDir.writeUInt16LE(0, o); o += 2;
+    centralDir.writeUInt16LE(0, o); o += 2;
+    centralDir.writeUInt16LE(0, o); o += 2;
+    centralDir.writeUInt16LE(0, o); o += 2;
+    centralDir.writeUInt32LE(0, o); o += 4;
+    centralDir.writeUInt32LE(fileData.length, o); o += 4;
+    centralDir.writeUInt32LE(fileData.length, o); o += 4;
+    centralDir.writeUInt16LE(fnBuf.length, o); o += 2;
+    centralDir.writeUInt16LE(0, o); o += 2;
+    centralDir.writeUInt16LE(0, o); o += 2;
+    centralDir.writeUInt16LE(0, o); o += 2;
+    centralDir.writeUInt16LE(0, o); o += 2;
+    centralDir.writeUInt32LE(0xA1ED0000, o); o += 4;  // S_IFLNK | 0755
+    centralDir.writeUInt32LE(0, o); o += 4;
+    fnBuf.copy(centralDir, o);
+
+    const eocd = Buffer.alloc(22);
+    o = 0;
+    eocd.writeUInt32LE(0x06054b50, o); o += 4;
+    eocd.writeUInt16LE(0, o); o += 2;
+    eocd.writeUInt16LE(0, o); o += 2;
+    eocd.writeUInt16LE(1, o); o += 2;
+    eocd.writeUInt16LE(1, o); o += 2;
+    eocd.writeUInt32LE(centralDir.length, o); o += 4;
+    eocd.writeUInt32LE(cdOffset, o); o += 4;
+    eocd.writeUInt16LE(0, o); o += 2;
+
+    const symlinkZip = path.join(tmpDir, 'symlink.zip');
+    await fs.writeFile(symlinkZip, Buffer.concat([localHeader, centralDir, eocd]));
+
+    const destDir = path.join(tmpDir, 'symlink-dest');
+    await fs.mkdir(destDir, { recursive: true });
+    await expect(extractZip(symlinkZip, destDir)).rejects.toMatchObject({ code: 'ZIP_SLIP' });
   });
 });
