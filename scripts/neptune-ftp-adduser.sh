@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ $# -lt 2 ]]; then
+  echo "Usage: $(basename "$0") <username> <home_dir>" >&2
+  exit 1
+fi
+
 USERNAME="$1"
 HOME_DIR="$2"
 

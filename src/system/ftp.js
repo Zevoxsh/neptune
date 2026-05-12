@@ -13,8 +13,8 @@ function runScript(args, stdinData) {
       else reject(Object.assign(new Error(`Script exited with code ${code}`), { code: 'SCRIPT_ERROR' }));
     });
     proc.on('error', reject);
-    if (stdinData) proc.stdin.write(stdinData);
-    proc.stdin.end();
+    if (stdinData) proc.stdin?.write(stdinData);
+    proc.stdin?.end();
   });
 }
 
