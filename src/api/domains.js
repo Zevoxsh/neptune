@@ -70,22 +70,29 @@ router.post('/', requireAuth, async (req, res) => {
   // For subdomains: validate parent domain ownership
   if (type === 'subdomain') {
     if (!parent_domain_id) return res.status(400).json({ error: 'parent_domain_id required for subdomain' });
-    const parentDomain = await domains.getDomainById(parent_domain_id);
+    const parsedParentId = parseId(parent_domain_id);
+    if (!parsedParentId) return res.status(400).json({ error: 'parent_domain_id must be a positive integer' });
+    const parentDomain = await domains.getDomainById(parsedParentId);
     if (!parentDomain || !parentDomain.is_active) return res.status(400).json({ error: 'Parent domain not found or inactive' });
     if (req.user.role === 'user' && parentDomain.user_id !== req.user.id) {
       return res.status(403).json({ error: 'Parent domain not owned by you' });
     }
-    if (req.user.role === 'client') {
-      // Client's parent user must own the parent domain
-      const self = await getUserById(req.user.id);
-      if (!self.parent_id || parentDomain.user_id !== self.parent_id) {
-        return res.status(403).json({ error: 'Parent domain does not belong to your parent user' });
-      }
-    }
+    // client parent-ownership check moved inside try block
   }
 
   try {
     const self = await getUserById(req.user.id);
+    if (!self) return res.status(403).json({ error: 'Forbidden' });
+
+    // Client subdomain: verify parent domain belongs to client's parent user
+    if (req.user.role === 'client' && type === 'subdomain' && parent_domain_id) {
+      const parsedParentId = parseId(parent_domain_id);
+      const parentDomain = await domains.getDomainById(parsedParentId);
+      if (!self.parent_id || !parentDomain || parentDomain.user_id !== self.parent_id) {
+        return res.status(403).json({ error: 'Parent domain does not belong to your parent user' });
+      }
+    }
+
     const domain = await domains.createDomain({
       userId: req.user.id,
       username: self.username,
@@ -97,7 +104,7 @@ router.post('/', requireAuth, async (req, res) => {
     const hostname = await domains.getHostname(domain);
     await vhost.writeVhostFiles({ hostname, documentRoot: domain.document_root, phpVersion: php_version });
     await vhost.reloadWeb();
-    await audit.log({ userId: req.user.id, action: 'create_domain', targetType: 'domain', targetId: domain.id, ip: req.ip });
+    await audit.log({ userId: req.user.id, action: 'create_domain', targetType: 'domain', targetId: domain.id, ip: req.ip }).catch(e => console.error('audit failure:', e));
     res.status(201).json({ domain });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Domain name already exists' });
@@ -117,15 +124,15 @@ router.put('/:id', requireAuth, async (req, res) => {
     return res.status(400).json({ error: `php_version must be one of: ${VALID_PHP_VERSIONS.join(', ')}` });
   }
 
-  if (req.user.role === 'client' && php_version !== undefined) {
-    const perms = await getClientPermissions(req.user.id);
-    if (!perms.allow_php_version_choice) return res.status(403).json({ error: 'PHP version choice not allowed for this account' });
-  }
-
   try {
     const domain = await domains.getDomainById(domainId);
     if (!domain) return res.status(404).json({ error: 'Domain not found' });
     if (!canAccessDomain(req.user, domain)) return res.status(403).json({ error: 'Forbidden' });
+
+    if (req.user.role === 'client' && php_version !== undefined) {
+      const perms = await getClientPermissions(req.user.id);
+      if (!perms.allow_php_version_choice) return res.status(403).json({ error: 'PHP version choice not allowed for this account' });
+    }
 
     const updated = await domains.updateDomain(domainId, { phpVersion: php_version });
     const hostname = await domains.getHostname(domain);
@@ -139,7 +146,7 @@ router.put('/:id', requireAuth, async (req, res) => {
       keyPath: sslRec ? sslRec.key_path : null,
     });
     await vhost.reloadWeb();
-    await audit.log({ userId: req.user.id, action: 'update_domain', targetType: 'domain', targetId: domainId, ip: req.ip });
+    await audit.log({ userId: req.user.id, action: 'update_domain', targetType: 'domain', targetId: domainId, ip: req.ip }).catch(e => console.error('audit failure:', e));
     res.json({ domain: updated });
   } catch (err) {
     console.error(err);
@@ -157,9 +164,10 @@ router.delete('/:id', requireAuth, requireRole('admin', 'user'), async (req, res
     if (!canAccessDomain(req.user, domain)) return res.status(403).json({ error: 'Forbidden' });
     const hostname = await domains.getHostname(domain);
     await domains.deactivateDomain(domainId);
+    await ssl.removeSslRecord(domainId);
     await vhost.removeVhostFiles(hostname);
     await vhost.reloadWeb();
-    await audit.log({ userId: req.user.id, action: 'delete_domain', targetType: 'domain', targetId: domainId, ip: req.ip });
+    await audit.log({ userId: req.user.id, action: 'delete_domain', targetType: 'domain', targetId: domainId, ip: req.ip }).catch(e => console.error('audit failure:', e));
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
@@ -203,7 +211,7 @@ router.post('/:id/ssl', requireAuth, requireRole('admin', 'user'), async (req, r
       keyPath,
     });
     await vhost.reloadWeb();
-    await audit.log({ userId: req.user.id, action: 'enable_ssl', targetType: 'domain', targetId: domainId, ip: req.ip });
+    await audit.log({ userId: req.user.id, action: 'enable_ssl', targetType: 'domain', targetId: domainId, ip: req.ip }).catch(e => console.error('audit failure:', e));
 
     const sslRecord = await ssl.getSslRecord(domainId);
     res.json({ domain: updated, ssl: sslRecord });
@@ -232,7 +240,7 @@ router.delete('/:id/ssl', requireAuth, requireRole('admin', 'user'), async (req,
       sslEnabled: false,
     });
     await vhost.reloadWeb();
-    await audit.log({ userId: req.user.id, action: 'disable_ssl', targetType: 'domain', targetId: domainId, ip: req.ip });
+    await audit.log({ userId: req.user.id, action: 'disable_ssl', targetType: 'domain', targetId: domainId, ip: req.ip }).catch(e => console.error('audit failure:', e));
     res.json({ ok: true, domain: updated });
   } catch (err) {
     console.error(err);
