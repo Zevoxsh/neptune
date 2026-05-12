@@ -17,7 +17,7 @@ const PHP_VERSION_RE = /^\d+\.\d+$/;
 function assertSafe(hostname, documentRoot, phpVersion) {
   if (!HOSTNAME_RE.test(hostname)) throw Object.assign(new Error(`Invalid hostname: ${hostname}`), { code: 'INVALID_HOSTNAME' });
   if (phpVersion !== undefined && !PHP_VERSION_RE.test(phpVersion)) throw Object.assign(new Error(`Invalid phpVersion: ${phpVersion}`), { code: 'INVALID_PHP_VERSION' });
-  if (documentRoot !== undefined && (!/^\//.test(documentRoot) || /[\n\r]/.test(documentRoot))) {
+  if (documentRoot !== undefined && (!/^\//.test(documentRoot) || /[\n\r"';\\]/.test(documentRoot))) {
     throw Object.assign(new Error(`Invalid documentRoot: ${documentRoot}`), { code: 'INVALID_DOCUMENT_ROOT' });
   }
 }
@@ -105,8 +105,8 @@ async function writeVhostFiles({ hostname, documentRoot, phpVersion, sslEnabled 
 
 async function removeVhostFiles(hostname) {
   await Promise.all([
-    fs.unlink(path.join(apacheDir(), `neptune-${hostname}.conf`)).catch(() => {}),
-    fs.unlink(path.join(nginxDir(), `neptune-${hostname}.conf`)).catch(() => {}),
+    fs.unlink(path.join(apacheDir(), `neptune-${hostname}.conf`)).catch(e => { if (e.code !== 'ENOENT') throw e; }),
+    fs.unlink(path.join(nginxDir(), `neptune-${hostname}.conf`)).catch(e => { if (e.code !== 'ENOENT') throw e; }),
   ]);
 }
 

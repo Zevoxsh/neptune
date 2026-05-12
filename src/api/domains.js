@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const fs = require('fs/promises');
 const { requireAuth } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 const audit = require('../services/audit');
@@ -38,7 +39,7 @@ router.get('/:id', requireAuth, async (req, res) => {
   if (domainId === null) return res.status(400).json({ error: 'Invalid id' });
   try {
     const domain = await domains.getDomainById(domainId);
-    if (!domain) return res.status(404).json({ error: 'Domain not found' });
+    if (!domain || !domain.is_active) return res.status(404).json({ error: 'Domain not found' });
     if (!canAccessDomain(req.user, domain)) return res.status(403).json({ error: 'Forbidden' });
     res.json({ domain });
   } catch (err) {
@@ -102,6 +103,7 @@ router.post('/', requireAuth, async (req, res) => {
       phpVersion: php_version,
     });
     const hostname = await domains.getHostname(domain);
+    await fs.mkdir(domain.document_root, { recursive: true, mode: 0o755 });
     await vhost.writeVhostFiles({ hostname, documentRoot: domain.document_root, phpVersion: php_version });
     await vhost.reloadWeb();
     await audit.log({ userId: req.user.id, action: 'create_domain', targetType: 'domain', targetId: domain.id, ip: req.ip }).catch(e => console.error('audit failure:', e));
@@ -126,7 +128,7 @@ router.put('/:id', requireAuth, async (req, res) => {
 
   try {
     const domain = await domains.getDomainById(domainId);
-    if (!domain) return res.status(404).json({ error: 'Domain not found' });
+    if (!domain || !domain.is_active) return res.status(404).json({ error: 'Domain not found' });
     if (!canAccessDomain(req.user, domain)) return res.status(403).json({ error: 'Forbidden' });
 
     if (req.user.role === 'client' && php_version !== undefined) {
@@ -160,7 +162,7 @@ router.delete('/:id', requireAuth, requireRole('admin', 'user'), async (req, res
   if (domainId === null) return res.status(400).json({ error: 'Invalid id' });
   try {
     const domain = await domains.getDomainById(domainId);
-    if (!domain) return res.status(404).json({ error: 'Domain not found' });
+    if (!domain || !domain.is_active) return res.status(404).json({ error: 'Domain not found' });
     if (!canAccessDomain(req.user, domain)) return res.status(403).json({ error: 'Forbidden' });
     const hostname = await domains.getHostname(domain);
     await domains.deactivateDomain(domainId);
@@ -190,7 +192,7 @@ router.post('/:id/ssl', requireAuth, requireRole('admin', 'user'), async (req, r
 
   try {
     const domain = await domains.getDomainById(domainId);
-    if (!domain) return res.status(404).json({ error: 'Domain not found' });
+    if (!domain || !domain.is_active) return res.status(404).json({ error: 'Domain not found' });
     if (!canAccessDomain(req.user, domain)) return res.status(403).json({ error: 'Forbidden' });
 
     const hostname = await domains.getHostname(domain);
@@ -227,7 +229,7 @@ router.delete('/:id/ssl', requireAuth, requireRole('admin', 'user'), async (req,
   if (domainId === null) return res.status(400).json({ error: 'Invalid id' });
   try {
     const domain = await domains.getDomainById(domainId);
-    if (!domain) return res.status(404).json({ error: 'Domain not found' });
+    if (!domain || !domain.is_active) return res.status(404).json({ error: 'Domain not found' });
     if (!canAccessDomain(req.user, domain)) return res.status(403).json({ error: 'Forbidden' });
 
     await ssl.removeSslRecord(domainId);
