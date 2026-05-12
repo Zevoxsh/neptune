@@ -47,12 +47,17 @@ async function createDatabase({ userId, name }) {
   const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
 
   await mysql.createDatabase(dbName, dbUser, password);
-  const [result] = await pool.query(
-    'INSERT INTO `databases` (user_id, db_name, db_user, db_password_hash) VALUES (?, ?, ?, ?)',
-    [userId, dbName, dbUser, passwordHash]
-  );
-  const database = await getDatabaseById(result.insertId);
-  return { database, password };
+  try {
+    const [result] = await pool.query(
+      'INSERT INTO `databases` (user_id, db_name, db_user, db_password_hash) VALUES (?, ?, ?, ?)',
+      [userId, dbName, dbUser, passwordHash]
+    );
+    const database = await getDatabaseById(result.insertId);
+    return { database, password };
+  } catch (err) {
+    await mysql.dropDatabase(dbName, dbUser).catch(e => console.error('MySQL cleanup failed:', e));
+    throw err;
+  }
 }
 
 async function listDatabases({ requestingUserId, requestingRole }) {
