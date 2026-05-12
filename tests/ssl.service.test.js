@@ -16,6 +16,7 @@ const TMP_SSL = path.join(os.tmpdir(), `neptune-ssl-test-${Date.now()}`);
 
 beforeAll(() => {
   process.env.NEPTUNE_SSL_DIR = TMP_SSL;
+  process.env.NEPTUNE_CERTBOT_EMAIL = 'admin@test.com';
 });
 
 afterAll(async () => {
