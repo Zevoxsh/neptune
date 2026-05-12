@@ -21,6 +21,7 @@ const upload = multer({
 
 async function getUserAndRoot(req) {
   const user = await getUserById(req.user.id);
+  if (!user) throw Object.assign(new Error('Unauthorized'), { code: 'UNAUTHORIZED' });
   const root = fileService.getUserRoot({ role: req.user.role, username: user.username });
   return { user, root };
 }
@@ -34,6 +35,7 @@ router.get('/', requireAuth, async (req, res) => {
     const entries = await fileService.listDir(absPath);
     res.json({ entries });
   } catch (err) {
+    if (err.code === 'UNAUTHORIZED') return res.status(401).json({ error: 'Unauthorized' });
     if (err.code === 'PATH_TRAVERSAL') return res.status(400).json({ error: 'Path traversal detected' });
     if (err.code === 'ENOENT') return res.status(404).json({ error: 'Not found' });
     if (err.code === 'ENOTDIR') return res.status(400).json({ error: 'Not a directory' });
@@ -57,6 +59,7 @@ router.get('/download', requireAuth, async (req, res) => {
       }
     });
   } catch (err) {
+    if (err.code === 'UNAUTHORIZED') return res.status(401).json({ error: 'Unauthorized' });
     if (err.code === 'PATH_TRAVERSAL') return res.status(400).json({ error: 'Path traversal detected' });
     if (err.code === 'ENOENT') return res.status(404).json({ error: 'Not found' });
     console.error(err);
@@ -72,7 +75,11 @@ router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
     const { root } = await getUserAndRoot(req);
     const userPath = req.query.path || '/';
     const dir = await fileService.resolveSafe(root, userPath);
-    const destPath = path.join(dir, req.file.originalname);
+    const safeName = path.basename(req.file.originalname);
+    if (!safeName || safeName === '.' || safeName === '..') {
+      throw Object.assign(new Error('Invalid filename'), { code: 'PATH_TRAVERSAL' });
+    }
+    const destPath = path.join(dir, safeName);
     try {
       await fs.rename(tmpPath, destPath);
     } catch (renameErr) {
@@ -87,6 +94,7 @@ router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
     res.json({ ok: true, name: req.file.originalname, size: req.file.size });
   } catch (err) {
     await fs.unlink(tmpPath).catch(() => {});
+    if (err.code === 'UNAUTHORIZED') return res.status(401).json({ error: 'Unauthorized' });
     if (err.code === 'PATH_TRAVERSAL') return res.status(400).json({ error: 'Path traversal detected' });
     if (err.code === 'ENOENT') return res.status(404).json({ error: 'Directory not found' });
     console.error(err);
@@ -104,6 +112,7 @@ router.post('/mkdir', requireAuth, async (req, res) => {
     await fileService.makeDir(absPath);
     res.json({ ok: true });
   } catch (err) {
+    if (err.code === 'UNAUTHORIZED') return res.status(401).json({ error: 'Unauthorized' });
     if (err.code === 'PATH_TRAVERSAL') return res.status(400).json({ error: 'Path traversal detected' });
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -121,6 +130,7 @@ router.post('/rename', requireAuth, async (req, res) => {
     await fileService.renameEntry(absSrc, absDest);
     res.json({ ok: true });
   } catch (err) {
+    if (err.code === 'UNAUTHORIZED') return res.status(401).json({ error: 'Unauthorized' });
     if (err.code === 'PATH_TRAVERSAL') return res.status(400).json({ error: 'Path traversal detected' });
     if (err.code === 'ENOENT') return res.status(404).json({ error: 'Not found' });
     console.error(err);
@@ -139,6 +149,7 @@ router.post('/copy', requireAuth, async (req, res) => {
     await fileService.copyEntry(absSrc, absDest);
     res.json({ ok: true });
   } catch (err) {
+    if (err.code === 'UNAUTHORIZED') return res.status(401).json({ error: 'Unauthorized' });
     if (err.code === 'PATH_TRAVERSAL') return res.status(400).json({ error: 'Path traversal detected' });
     if (err.code === 'ENOENT') return res.status(404).json({ error: 'Not found' });
     console.error(err);
@@ -157,6 +168,7 @@ router.delete('/', requireAuth, async (req, res) => {
     await audit.log({ userId: req.user.id, action: 'delete_file', targetType: 'file', targetId: null, ip: req.ip, details: { path: absPath } }).catch(e => console.error('audit failure:', e));
     res.json({ ok: true });
   } catch (err) {
+    if (err.code === 'UNAUTHORIZED') return res.status(401).json({ error: 'Unauthorized' });
     if (err.code === 'PATH_TRAVERSAL') return res.status(400).json({ error: 'Path traversal detected' });
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -177,6 +189,7 @@ router.post('/archive', requireAuth, async (req, res) => {
     await archive.createZip(absPaths, absDest);
     res.json({ ok: true, dest });
   } catch (err) {
+    if (err.code === 'UNAUTHORIZED') return res.status(401).json({ error: 'Unauthorized' });
     if (err.code === 'PATH_TRAVERSAL') return res.status(400).json({ error: 'Path traversal detected' });
     if (err.code === 'ENOENT') return res.status(404).json({ error: 'Not found' });
     console.error(err);
@@ -195,6 +208,7 @@ router.post('/extract', requireAuth, async (req, res) => {
     await archive.extractZip(absSrc, absDest);
     res.json({ ok: true, dest });
   } catch (err) {
+    if (err.code === 'UNAUTHORIZED') return res.status(401).json({ error: 'Unauthorized' });
     if (err.code === 'PATH_TRAVERSAL') return res.status(400).json({ error: 'Path traversal detected' });
     if (err.code === 'ENOENT') return res.status(404).json({ error: 'Not found' });
     if (err.code === 'ZIP_SLIP') return res.status(400).json({ error: 'Invalid archive entry' });
