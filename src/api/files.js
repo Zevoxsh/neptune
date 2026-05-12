@@ -49,7 +49,13 @@ router.get('/download', requireAuth, async (req, res) => {
     const userPath = req.query.path;
     if (!userPath) return res.status(400).json({ error: 'path required' });
     const absPath = await fileService.resolveSafe(root, userPath);
-    res.download(absPath);
+    await fs.access(absPath);
+    res.download(absPath, (err) => {
+      if (err && !res.headersSent) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
   } catch (err) {
     if (err.code === 'PATH_TRAVERSAL') return res.status(400).json({ error: 'Path traversal detected' });
     if (err.code === 'ENOENT') return res.status(404).json({ error: 'Not found' });
