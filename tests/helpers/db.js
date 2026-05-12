@@ -30,4 +30,9 @@ async function createUser({
   return { id: result.insertId, username, email, role };
 }
 
-module.exports = { clearTables, createUser };
+async function createDomain({ userId, username, name, type = 'domain', parentDomainId = null, phpVersion = '8.2' }) {
+  const { createDomain: svcCreate } = require('../../src/services/domains');
+  return svcCreate({ userId, username, name, type, parentDomainId, phpVersion });
+}
+
+module.exports = { clearTables, createUser, createDomain };
