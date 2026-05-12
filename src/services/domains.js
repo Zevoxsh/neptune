@@ -9,8 +9,12 @@ function buildDocumentRoot(username, hostname) {
 }
 
 async function createDomain({ userId, username, name, type, parentDomainId = null, phpVersion = '8.2' }) {
+  if (!VALID_PHP_VERSIONS.includes(phpVersion)) {
+    throw Object.assign(new Error(`php_version must be one of: ${VALID_PHP_VERSIONS.join(', ')}`), { code: 'INVALID_PHP_VERSION' });
+  }
   let hostname = name;
-  if (type === 'subdomain' && parentDomainId) {
+  if (type === 'subdomain') {
+    if (!parentDomainId) throw Object.assign(new Error('parentDomainId required for subdomain'), { code: 'PARENT_REQUIRED' });
     const parent = await getDomainById(parentDomainId);
     if (!parent) throw Object.assign(new Error('Parent domain not found'), { code: 'PARENT_NOT_FOUND' });
     hostname = `${name}.${parent.name}`;
@@ -51,6 +55,9 @@ async function listDomains({ requestingUserId, requestingRole }) {
 }
 
 async function updateDomain(id, { phpVersion, sslEnabled, sslType }) {
+  if (phpVersion !== undefined && !VALID_PHP_VERSIONS.includes(phpVersion)) {
+    throw Object.assign(new Error(`php_version must be one of: ${VALID_PHP_VERSIONS.join(', ')}`), { code: 'INVALID_PHP_VERSION' });
+  }
   const fields = [];
   const values = [];
   if (phpVersion !== undefined) { fields.push('php_version = ?'); values.push(phpVersion); }
