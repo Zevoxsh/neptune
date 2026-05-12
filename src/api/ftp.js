@@ -52,6 +52,7 @@ router.post('/', requireAuth, requireRole('admin', 'user'), async (req, res) => 
     if (err.code === 'PATH_TRAVERSAL') return res.status(400).json({ error: 'home_dir is outside your root' });
     if (err.code === 'INVALID_FTP_USERNAME') return res.status(400).json({ error: 'Invalid ftp_username' });
     if (err.code === 'WEAK_PASSWORD') return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    if (err.code === 'SCRIPT_ERROR') return res.status(502).json({ error: 'FTP system error' });
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -73,7 +74,9 @@ router.put('/:id/password', requireAuth, async (req, res) => {
     await audit.log({ userId: req.user.id, action: 'change_ftp_password', targetType: 'ftp_account', targetId: accountId, ip: req.ip }).catch(e => console.error('audit failure:', e));
     res.json({ ok: true });
   } catch (err) {
+    if (err.code === 'NOT_FOUND') return res.status(404).json({ error: 'FTP account not found' });
     if (err.code === 'WEAK_PASSWORD') return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    if (err.code === 'SCRIPT_ERROR') return res.status(502).json({ error: 'FTP system error' });
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
   }

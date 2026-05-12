@@ -91,7 +91,7 @@ router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
       }
     }
     await audit.log({ userId: req.user.id, action: 'upload_file', targetType: 'file', targetId: null, ip: req.ip, details: { path: destPath } }).catch(e => console.error('audit failure:', e));
-    res.json({ ok: true, name: req.file.originalname, size: req.file.size });
+    res.json({ ok: true, name: safeName, size: req.file.size });
   } catch (err) {
     await fs.unlink(tmpPath).catch(() => {});
     if (err.code === 'UNAUTHORIZED') return res.status(401).json({ error: 'Unauthorized' });
