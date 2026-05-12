@@ -32,6 +32,7 @@ router.post('/', requireAuth, requireRole('admin', 'user'), async (req, res) => 
   try {
     const { database, password } = await dbService.createDatabase({ userId: req.user.id, name });
     await audit.log({ userId: req.user.id, action: 'create_database', targetType: 'database', targetId: database.id, ip: req.ip }).catch(e => console.error('audit failure:', e));
+    // database is safe: DB_FIELDS excludes db_password_hash
     res.status(201).json({ database, password });
   } catch (err) {
     if (err.code === 'INVALID_DB_NAME') return res.status(400).json({ error: 'Invalid database name' });
@@ -69,7 +70,6 @@ router.put('/:id/password', requireAuth, async (req, res) => {
     await audit.log({ userId: req.user.id, action: 'reset_db_password', targetType: 'database', targetId: dbId, ip: req.ip }).catch(e => console.error('audit failure:', e));
     res.json({ ok: true, password });
   } catch (err) {
-    if (err.code === 'NOT_FOUND') return res.status(404).json({ error: 'Database not found' });
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
   }
