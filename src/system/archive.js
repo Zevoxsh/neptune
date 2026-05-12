@@ -28,11 +28,17 @@ async function createZip(absPaths, absDestZip) {
 }
 
 async function extractZip(absSrcZip, absDestDir) {
-  await fs.mkdir(absDestDir, { recursive: true });
+  const safeDest = path.resolve(absDestDir);
+  await fs.mkdir(safeDest, { recursive: true });
   const directory = await unzipper.Open.file(absSrcZip);
   for (const file of directory.files) {
-    const destPath = path.resolve(absDestDir, file.path);
-    if (destPath !== absDestDir && !destPath.startsWith(absDestDir + path.sep)) {
+    // Reject symlink entries — Unix mode bits 0xA000 encode a symlink
+    const unixMode = (file.externalFileAttributes >> 16) & 0xFFFF;
+    if ((unixMode & 0xF000) === 0xA000) {
+      throw Object.assign(new Error(`Symlink entry rejected: ${file.path}`), { code: 'ZIP_SLIP' });
+    }
+    const destPath = path.resolve(safeDest, file.path);
+    if (destPath !== safeDest && !destPath.startsWith(safeDest + path.sep)) {
       throw Object.assign(new Error(`Zip-slip detected: ${file.path}`), { code: 'ZIP_SLIP' });
     }
     if (file.type === 'Directory') {
