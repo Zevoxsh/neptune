@@ -16,6 +16,7 @@ async function createFtpAccount({ userId, ftpUsername, password, homeDir }) {
     throw Object.assign(new Error('Password must be at least 8 characters'), { code: 'WEAK_PASSWORD' });
   }
   const user = await getUserById(userId);
+  if (!user) throw Object.assign(new Error('User not found'), { code: 'NOT_FOUND' });
   const root = getUserRoot({ role: user.role, username: user.username });
   const resolved = await resolveSafe(root, homeDir);
   const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
@@ -60,7 +61,7 @@ async function changeFtpPassword(id, newPassword) {
 async function deactivateFtpAccount(id) {
   const account = await getFtpAccountById(id);
   if (!account) throw Object.assign(new Error('FTP account not found'), { code: 'NOT_FOUND' });
-  await ftp.deleteFtpUser(account.ftp_username);
+  await ftp.deleteFtpUser(account.ftp_username).catch(e => console.error('FTP system delete failed:', e));
   await pool.query('UPDATE ftp_accounts SET is_active = 0 WHERE id = ?', [id]);
 }
 

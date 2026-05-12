@@ -59,6 +59,12 @@ describe('createFtpAccount', () => {
       userId: user.id, ftpUsername: 'dave_ftp', password: 'password123', homeDir: '../../etc',
     })).rejects.toMatchObject({ code: 'PATH_TRAVERSAL' });
   });
+
+  it('throws NOT_FOUND for non-existent userId', async () => {
+    await expect(createFtpAccount({
+      userId: 999999, ftpUsername: 'ghost_ftp', password: 'password123', homeDir: '.',
+    })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
 });
 
 describe('listFtpAccounts', () => {
