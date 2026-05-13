@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neptune — Dashboard</title>
+  <link rel="stylesheet" href="/panel/css/main.css">
+</head>
+<body>
+  <div class="layout">
+    <div id="sidebar"></div>
+    <div id="main">
+      <div class="topbar">
+        <div class="topbar-title">Dashboard</div>
+        <div class="topbar-sub" id="topbar-version">neptune v1.0</div>
+      </div>
+      <div class="page-content">
+        <div class="widget-grid">
+          <div class="widget">
+            <div class="widget-value text-accent" id="w-domains">—</div>
+            <div class="widget-label">Domaines actifs</div>
+          </div>
+          <div class="widget">
+            <div class="widget-value text-success" id="w-dbs">—</div>
+            <div class="widget-label">Bases de données</div>
+          </div>
+          <div class="widget">
+            <div class="widget-value text-muted" id="w-ftp">—</div>
+            <div class="widget-label">Comptes FTP</div>
+          </div>
+          <div class="widget">
+            <div class="widget-value" id="w-disk-text">— / —</div>
+            <div class="widget-label">
+              <div class="widget-progress-bar">
+                <div class="widget-progress-fill" id="w-disk-bar" style="width:0%"></div>
+              </div>
+              <div style="margin-top:4px;">Disque utilisé</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Domaines récents</div>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Domaine</th>
+                <th>PHP</th>
+                <th>SSL</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody id="domains-table-body">
+              <tr><td colspan="4" class="text-muted">Chargement…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/panel/js/api.js"></script>
+  <script src="/panel/js/auth.js"></script>
+  <script src="/panel/js/sidebar.js"></script>
+  <script>
+    async function loadDashboard() {
+      const token = localStorage.getItem('neptune_token');
+      const payload = api.parseJwt(token);
+      const userId = payload && payload.id;
+
+      const [domainsRes, dbsRes, ftpRes, userRes] = await Promise.all([
+        api.get('/domains'),
+        api.get('/databases'),
+        api.get('/ftp'),
+        userId ? api.get(`/users/${userId}`) : Promise.resolve(null),
+      ]);
+
+      if (domainsRes && domainsRes.ok) {
+        const domains = await domainsRes.json();
+        document.getElementById('w-domains').textContent = domains.length;
+        renderDomainsTable(domains.slice(0, 5));
+      }
+
+      if (dbsRes && dbsRes.ok) {
+        const dbs = await dbsRes.json();
+        document.getElementById('w-dbs').textContent = dbs.length;
+      }
+
+      if (ftpRes && ftpRes.ok) {
+        const ftp = await ftpRes.json();
+        document.getElementById('w-ftp').textContent = ftp.length;
+      }
+
+      if (userRes && userRes.ok) {
+        const user = await userRes.json();
+        const used  = user.disk_used_mb  || 0;
+        const quota = user.disk_quota_mb || 0;
+        document.getElementById('w-disk-text').textContent = `${used} MB / ${quota} MB`;
+        const pct = quota > 0 ? Math.min(100, Math.round(used / quota * 100)) : 0;
+        document.getElementById('w-disk-bar').style.width = `${pct}%`;
+      }
+    }
+
+    function renderDomainsTable(domains) {
+      const tbody = document.getElementById('domains-table-body');
+      if (!domains.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-muted">Aucun domaine</td></tr>';
+        return;
+      }
+      tbody.innerHTML = domains.map(d => `
+        <tr>
+          <td>${d.name}</td>
+          <td class="text-accent">${d.php_version || '—'}</td>
+          <td class="${d.ssl_enabled ? 'text-success' : 'text-muted'}">${d.ssl_enabled ? '✓ SSL' : '—'}</td>
+          <td class="${d.active ? 'text-success' : 'text-muted'}">${d.active ? 'Actif' : 'Inactif'}</td>
+        </tr>
+      `).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', loadDashboard);
+  </script>
+</body>
+</html>
