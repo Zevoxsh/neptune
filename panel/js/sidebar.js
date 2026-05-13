@@ -44,19 +44,23 @@
 
   const initial = username.charAt(0).toUpperCase();
 
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
   const html = `
     <div class="sidebar-logo">
       <div class="sidebar-logo-title">⚡ NEPTUNE</div>
-      <div class="sidebar-logo-host">${host}</div>
+      <div class="sidebar-logo-host">${escapeHtml(host)}</div>
     </div>
     <nav class="sidebar-nav">
       ${navHTML()}
     </nav>
     <div class="sidebar-footer">
-      <div class="sidebar-avatar">${initial}</div>
+      <div class="sidebar-avatar">${escapeHtml(initial)}</div>
       <div>
-        <div class="sidebar-user-name">${username}</div>
-        <div class="sidebar-user-role">${role}</div>
+        <div class="sidebar-user-name">${escapeHtml(username)}</div>
+        <div class="sidebar-user-role">${escapeHtml(role)}</div>
       </div>
       <button class="sidebar-logout" id="btn-logout" title="Déconnexion">⏻</button>
     </div>
