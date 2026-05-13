@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neptune — Connexion</title>
+  <link rel="stylesheet" href="/panel/css/main.css">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .login-card {
+      width: 360px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 40px;
+    }
+    .login-logo {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .login-logo-title {
+      color: var(--accent);
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+    .login-logo-sub {
+      color: var(--dim);
+      font-size: 13px;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-title">⚡ NEPTUNE</div>
+      <div class="login-logo-sub">Panneau d'hébergement</div>
+    </div>
+
+    <div class="form-group">
+      <label for="username">Identifiant</label>
+      <input type="text" id="username" placeholder="alice" autocomplete="username">
+    </div>
+
+    <div class="form-group">
+      <label for="password">Mot de passe</label>
+      <input type="password" id="password" autocomplete="current-password">
+    </div>
+
+    <div class="form-error" id="login-error"></div>
+
+    <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitLogin()">
+      Se connecter
+    </button>
+  </div>
+
+  <script>
+    document.getElementById('username').addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
+    document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
+
+    async function submitLogin() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const errEl = document.getElementById('login-error');
+      errEl.classList.remove('visible');
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ username, password }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          localStorage.setItem('neptune_token', data.token);
+          window.location.href = '/panel/dashboard.html';
+          return;
+        }
+
+        if (res.status === 401) {
+          errEl.textContent = 'Identifiant ou mot de passe incorrect.';
+        } else if (res.status === 429) {
+          errEl.textContent = 'Trop de tentatives. Réessayez dans quelques secondes.';
+        } else {
+          errEl.textContent = 'Erreur serveur. Réessayez.';
+        }
+        errEl.classList.add('visible');
+      } catch {
+        errEl.textContent = 'Impossible de contacter le serveur.';
+        errEl.classList.add('visible');
+      }
+    }
+  </script>
+</body>
+</html>
