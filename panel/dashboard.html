@@ -63,6 +63,10 @@
   <script src="/panel/js/auth.js"></script>
   <script src="/panel/js/sidebar.js"></script>
   <script>
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
     async function loadDashboard() {
       const token = localStorage.getItem('neptune_token');
       const payload = api.parseJwt(token);
@@ -109,8 +113,8 @@
       }
       tbody.innerHTML = domains.map(d => `
         <tr>
-          <td>${d.name}</td>
-          <td class="text-accent">${d.php_version || '—'}</td>
+          <td>${escapeHtml(d.name)}</td>
+          <td class="text-accent">${escapeHtml(d.php_version || '—')}</td>
           <td class="${d.ssl_enabled ? 'text-success' : 'text-muted'}">${d.ssl_enabled ? '✓ SSL' : '—'}</td>
           <td class="${d.active ? 'text-success' : 'text-muted'}">${d.active ? 'Actif' : 'Inactif'}</td>
         </tr>
