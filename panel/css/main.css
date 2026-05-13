@@ -10,6 +10,10 @@
   --success:      #10b981;
   --warning:      #f59e0b;
   --danger:       #ef4444;
+  --danger-hover:  #dc2626;
+  --danger-bg:     #450a0a;
+  --danger-border: #7f1d1d;
+  --danger-text:   #fca5a5;
 }
 
 *, *::before, *::after {
@@ -295,12 +299,17 @@ body {
 }
 
 .btn-danger:hover {
-  background: #dc2626;
+  background: var(--danger-hover);
 }
 
 .btn-sm {
   padding: 4px 10px;
   font-size: 12px;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ── Forms ─────────────────────────────────────────── */
@@ -340,11 +349,11 @@ input[type="email"]:focus {
 }
 
 .form-error {
-  background: #450a0a;
-  border: 1px solid #7f1d1d;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
   border-radius: 6px;
   padding: 10px 12px;
-  color: #fca5a5;
+  color: var(--danger-text);
   font-size: 13px;
   margin-bottom: 16px;
   display: none;
