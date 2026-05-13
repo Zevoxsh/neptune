@@ -80,23 +80,23 @@
       ]);
 
       if (domainsRes && domainsRes.ok) {
-        const domains = await domainsRes.json();
+        const { domains } = await domainsRes.json();
         document.getElementById('w-domains').textContent = domains.length;
         renderDomainsTable(domains.slice(0, 5));
       }
 
       if (dbsRes && dbsRes.ok) {
-        const dbs = await dbsRes.json();
-        document.getElementById('w-dbs').textContent = dbs.length;
+        const { databases } = await dbsRes.json();
+        document.getElementById('w-dbs').textContent = databases.length;
       }
 
       if (ftpRes && ftpRes.ok) {
-        const ftp = await ftpRes.json();
-        document.getElementById('w-ftp').textContent = ftp.length;
+        const { accounts } = await ftpRes.json();
+        document.getElementById('w-ftp').textContent = accounts.length;
       }
 
       if (userRes && userRes.ok) {
-        const user = await userRes.json();
+        const { user } = await userRes.json();
         const used  = user.disk_used_mb  || 0;
         const quota = user.disk_quota_mb || 0;
         document.getElementById('w-disk-text').textContent = `${used} MB / ${quota} MB`;

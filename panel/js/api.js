@@ -27,7 +27,7 @@ async function apiFetch(method, path, body) {
       const r = await fetch(API_BASE + '/auth/refresh', { method: 'POST', credentials: 'include' });
       if (r.ok) {
         const data = await r.json();
-        localStorage.setItem('neptune_token', data.token);
+        localStorage.setItem('neptune_token', data.accessToken);
         _refreshing = false;
         return apiFetch(method, path, body);
       }
